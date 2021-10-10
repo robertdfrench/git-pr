@@ -68,8 +68,8 @@ mod tests {
 
     #[test]
     fn query_version_info() {
-        let path = Path::new(".").join("fake_git.sh");
-        let fake_git = Git::with_path(&path);
+        let path = Path::new("./target/debug/fake_git");
+        let fake_git = Git::with_path(path);
         let version = fake_git.version().unwrap();
         assert!(version.starts_with("fake_git version 1"));
     }
@@ -77,8 +77,8 @@ mod tests {
     #[test]
     #[should_panic]
     fn query_version_failure() {
-        let path = Path::new(".").join("failing_git.sh");
-        let failing_git = Git::with_path(&path);
+        let path = Path::new("./target/debug/failing_git");
+        let failing_git = Git::with_path(path);
         failing_git.version().unwrap();
     }
 

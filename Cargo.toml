@@ -13,27 +13,3 @@ lazy_static = "1.4.0"
 [lib]
 name = "libgitpr"
 path = "src/lib.rs"
-
-[[bin]]
-name = "git-pr-list"
-path = "src/list.rs"
-
-[[bin]]
-name = "git-pr-clean"
-path = "src/clean.rs"
-
-[[bin]]
-name = "git-pr-accept"
-path = "src/accept.rs"
-
-[[bin]]
-name = "git-pr-create"
-path = "src/create.rs"
-
-[[bin]]
-name = "git-pr-rebase"
-path = "src/rebase.rs"
-
-[[bin]]
-name = "git-pr-abandon"
-path = "src/abandon.rs"
