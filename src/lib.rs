@@ -96,6 +96,8 @@ mod tests {
           trunk
           remotes/origin/first-pr/0
           remotes/origin/second/3
+          remotes/origin/not-being-tracked
+          remotes/origin/has-a-directory-but/still-not-being-tracked
         ";
 
         let pr_names = extract_pr_names(branches);
