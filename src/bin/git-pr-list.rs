@@ -1,3 +1,4 @@
+//! Display a list of currently active Pull Requests
 use std::io;
 use libgitpr;
 

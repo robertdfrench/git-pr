@@ -1,3 +1,4 @@
+//! Test the git "client" wrapper against the real git binary.
 use libgitpr::Git;
 
 #[test]
