@@ -1,7 +1,6 @@
 //! Pull request management for bare repos
 use std::io;
 use std::ffi::OsString;
-use std::path::Path;
 use std::process::Command;
 
 use lazy_static::lazy_static;
@@ -15,9 +14,6 @@ pub struct Git {
 impl Git {
     pub fn new() -> Git {
         Git{ program: OsString::from("git") }
-    }
-    pub fn with_path(path: &Path) -> Git {
-        Git{ program: path.as_os_str().to_os_string() }
     }
     pub fn version(&self) -> io::Result<String> {
         let output = Command::new(&self.program).arg("--version").output()?;
@@ -64,7 +60,17 @@ pub fn extract_pr_names(branches: &str) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
     use super::*;
+
+    // Implementing this above produces a warning, since the function is (by design) never used by
+    // other application code. Since it is only used in this module, we implement this function
+    // local to this module, thus eliminating the dead code warning.
+    impl Git {
+        fn with_path(path: &Path) -> Git {
+            Git{ program: path.as_os_str().to_os_string() }
+        }
+    }
 
     #[test]
     fn query_version_info() {
