@@ -1,8 +1,9 @@
 //! Display a list of currently active Pull Requests
-use std::io;
+//!
+//! By "currently active", we mean "not yet deleted from the remote".
 use libgitpr;
 
-fn main() -> io::Result<()> {
+fn main() -> Result<(),libgitpr::GitError> {
     let git = libgitpr::Git::new();
     git.fetch_prune()?;
     let branches = git.all_branches()?;

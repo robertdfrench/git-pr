@@ -1,12 +1,13 @@
 //! Pull request management for bare repos
+
+
+use lazy_static::lazy_static; // Suggested by regex crate docs. We use this to compile regexes at
+                              // source code compile-time, saving crucial picoseconds at runtime.
+use regex::Regex;
 use std::io;
 use std::ffi::OsString;
 use std::process::Command;
-
-// Suggested by regex crate docs. We use this to compile regexes at compile-time, saving crucial
-// picoseconds at runtime.
-use lazy_static::lazy_static;
-use regex::Regex;
+use std::process::ExitStatus;
 
 
 /// Wrapper for the git command line program
@@ -25,6 +26,34 @@ pub struct Git {
 }
 
 
+/// Custom Error Type for Git Problems
+///
+/// Lower-level errors are wrapped into this type so that we can return a uniform error type
+/// without losing any of the original context.
+#[derive(Debug)]
+pub enum GitError {
+
+    /// We encountered an error while launching or waiting on the child process.
+    Io(io::Error),
+
+    /// The child process ran, but returned a non-zero exit code.
+    Exit(ExitStatus)
+}
+
+impl From<io::Error> for GitError {
+    /// Wrap an [`io::Error`] in a [`GitError::Io`]
+    fn from(other: io::Error) -> GitError {
+        GitError::Io(other)
+    }
+}
+
+fn assert_success(status: ExitStatus) -> Result<(),GitError> {
+    match status.success() {
+        true => Ok(()),
+        false => Err(GitError::Exit(status))
+    }
+}
+
 impl Git {
     /// Create a new "git client".
     ///
@@ -39,11 +68,10 @@ impl Git {
     /// This is equivalent to invoking `git --version` on the command line. Making this transparent
     /// to users of `git-pr` may help them begin to debug unexpected issues; For example, `git-pr`
     /// may not work correctly with very old versions of git.
-    pub fn version(&self) -> io::Result<String> {
+    pub fn version(&self) -> Result<String,GitError> {
         let output = Command::new(&self.program).arg("--version").output()?;
-        if !output.status.success() {
-            return Err(io::Error::new(io::ErrorKind::Other, "git --version"));
-        }
+        assert_success(output.status)?;
+
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     }
 
@@ -52,11 +80,10 @@ impl Git {
     /// This asks git to download the current list of branches from the remote server, cleaning up
     /// local references to any that have been deleted. This ensures that the user is able to see
     /// the same set of "current PRs" as their collaborators.
-    pub fn fetch_prune(&self) -> io::Result<()> {
+    pub fn fetch_prune(&self) -> Result<(),GitError> {
         let status = Command::new(&self.program).args(&["fetch","--prune"]).status()?;
-        if !status.success() {
-            return Err(io::Error::new(io::ErrorKind::Other, "git fetch --prune"));
-        }
+        assert_success(status)?;
+
         Ok(())
     }
 
@@ -65,11 +92,10 @@ impl Git {
     /// This asks the configured `git` binary to produce a list of *all* known branches, including
     /// references to remote branches. It is from this list that we can produce the list of
     /// "current PRs".
-    pub fn all_branches(&self) -> io::Result<String> {
+    pub fn all_branches(&self) -> Result<String,GitError> {
         let output = Command::new(&self.program).args(&["branch","-a"]).output()?;
-        if !output.status.success() {
-            return Err(io::Error::new(io::ErrorKind::Other, "git branch -a"));
-        }
+        assert_success(output.status)?;
+
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     }
 }
