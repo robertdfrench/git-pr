@@ -15,6 +15,16 @@ impl TestState {
         let working_dir = TempDir::new(prefix).unwrap();
         set_current_dir(working_dir.path()).unwrap();
 
+        // Setup git config for email
+        let status = Command::new("git")
+            .args(&["config","--global","user.email","you@example.com"]).status().unwrap();
+        assert!(status.success());
+
+        // Setup git config for name
+        let status = Command::new("git")
+            .args(&["config","--global","user.name","Your Name"]).status().unwrap();
+        assert!(status.success());
+
         // git init in new unique dir
         let status = Command::new("git").args(&["init"]).status().unwrap();
         assert!(status.success());
