@@ -18,6 +18,5 @@ fn fetch_and_prune() {
 fn can_list_all_branches() {
     let git = Git::new();
     let branches = git.all_branches().unwrap();
-    println!("{:?}", branches);
     assert!(branches.contains("trunk"));
 }
