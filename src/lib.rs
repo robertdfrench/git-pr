@@ -121,7 +121,7 @@ pub fn extract_pr_names(branches: &str) -> Vec<String> {
     // Compile regexes at compile time, rather than compiling them at runtime every time this
     // function is invoked. Honestly, this might be overkill.
     lazy_static! {
-        static ref BEGINS_WITH_REMOTE_REF: Regex = Regex::new(r"^ *\** remotes/origin/").unwrap();
+        static ref BEGINS_WITH_REMOTE_REF: Regex = Regex::new(r"^ *\** remotes/[^/]+/").unwrap();
         static ref ENDS_WITH_DIGIT: Regex = Regex::new(r"/\d+$").unwrap();
     }
 
@@ -199,5 +199,23 @@ mod tests {
         assert_eq!(pr_names.len(), 2);
         assert_eq!(pr_names[0], "first-pr");
         assert_eq!(pr_names[1], "second");
+    }
+
+    // Show that we can extract a list of pr names even when the remote is not "origin"
+    #[test]
+    fn parse_branches_from_custom_remotes() {
+        let branches: &'static str = "
+          remotes/yabba-dabba-doo/first-pr/0
+          remotes/yabba{dabba}doo/second/0
+          remotes/yabba/dabba/doo/third/0
+          remotes/yabba dabba doo/fourth/0
+        ";
+
+        let pr_names = extract_pr_names(branches);
+        assert_eq!(pr_names.len(), 4);
+        assert_eq!(pr_names[0], "first-pr");
+        assert_eq!(pr_names[1], "second");
+        assert_eq!(pr_names[2], "dabba/doo/third");
+        assert_eq!(pr_names[3], "fourth");
     }
 }
