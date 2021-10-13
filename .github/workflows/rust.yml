@@ -20,7 +20,7 @@ jobs:
     - name: CheckoutRepo
       uses: actions/checkout@v2
     - name: PrepareRepo
-      run: git checkout "${GITHUB_REF:11}"
+      run: git checkout -c "pull-request"
     - name: Build
       run: cargo build --release
     - name: Test
