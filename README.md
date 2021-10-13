@@ -2,7 +2,7 @@
 # `git-pr`
 *Pull requests without Git{Hub,Lab,Whatever}*
 
-[License](https://github.com/robertdfrench/portunusd/blob/trunk/LICENSE)
+[License](https://github.com/robertdfrench/git-pr/blob/trunk/LICENSE)
 &VerticalSeparator;
 [Roadmap](https://github.com/robertdfrench/git-pr/milestones)
 &VerticalSeparator;
