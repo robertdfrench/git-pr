@@ -163,7 +163,7 @@ mod tests {
     // invoked with the "--version" argument.
     #[test]
     fn query_version_info() {
-        let path = String::from("./target/debug/fake_git");
+        let path = String::from("./target/release/fake_git");
         let fake_git = Git::with_path(path);
         let version = fake_git.version().unwrap();
         assert!(version.starts_with("fake_git version 1"));
@@ -177,7 +177,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn query_version_failure() {
-        let path = String::from("./target/debug/failing_git");
+        let path = String::from("./target/release/failing_git");
         let failing_git = Git::with_path(path);
         failing_git.version().unwrap();
     }
