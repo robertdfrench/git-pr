@@ -38,6 +38,10 @@ impl TestState {
             .args(&["commit","--allow-empty","-m","hello"]).status().unwrap();
         assert!(status.success());
 
+        // create a fake branch to test deletion
+        let status = Command::new("git").args(&["branch","hotfix"]).status().unwrap();
+        assert!(status.success());
+
         Self{ working_dir }
     }
 
@@ -74,4 +78,13 @@ fn can_list_all_branches() {
     let git = Git::new();
     let branches = git.all_branches().unwrap();
     assert!(branches.contains("trunk"));
+}
+
+#[test]
+fn detect_merged_branches() {
+    println!("TempDir='{:?}'", TEST_STATE.path());
+
+    let git = Git::new();
+    let branches = git.merged_branches().unwrap();
+    assert!(branches.contains("hotfix"));
 }

@@ -97,6 +97,13 @@ impl Git {
 
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     }
+
+    pub fn merged_branches(&self) -> Result<String,GitError> {
+        let output = Command::new(&self.program).args(&["branch","--merged"]).output()?;
+        assert_success(output.status)?;
+
+        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    }
 }
 
 
@@ -217,5 +224,13 @@ mod tests {
         assert_eq!(pr_names[1], "second");
         assert_eq!(pr_names[2], "dabba/doo/third");
         assert_eq!(pr_names[3], "fourth");
+    }
+
+    #[test]
+    fn can_detect_merged_branches() {
+        let path = String::from("./target/release/fake_git");
+        let fake_git = Git::with_path(path);
+        let merged_branches = fake_git.merged_branches().unwrap();
+        assert!(merged_branches.contains("already-been-merged"));
     }
 }
