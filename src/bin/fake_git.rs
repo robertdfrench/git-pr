@@ -13,6 +13,11 @@ fn main() {
         Some("--version") => println!("fake_git version 1"),
         Some("branch") => match env::args().nth(2).as_deref() {
             None => exit(1),
+            Some("-d") => match env::args().nth(3).as_deref() {
+                None => exit(1),
+                Some("already-been-merged") => exit(0),
+                Some(_) => exit(1)
+            },
             Some("--merged") => println!("* trunk\nalready-been-merged"),
             Some(_) => exit(1)
         }

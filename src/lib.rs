@@ -104,6 +104,13 @@ impl Git {
 
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     }
+
+    pub fn delete_branch(&self, branch_name: &str) -> Result<(),GitError> {
+        let status = Command::new(&self.program).args(&["branch","-d",branch_name]).status()?;
+        assert_success(status)?;
+
+        Ok(())
+    }
 }
 
 
@@ -151,6 +158,14 @@ pub fn extract_pr_names(branches: &str) -> Vec<String> {
     pr_names
 }
 
+pub fn extract_deletable_branches(branches: &str) -> Vec<String> {
+    branches.lines()
+        .filter(|b| !b.starts_with("*")) // skip the current branch
+        .map(|b| b.trim_start()) // remove left-hand gutter characters
+        .map(|b| b.trim_end()) // remove newlines
+        .filter(|b| *b != "trunk")
+        .map(|b| b.to_string()).collect()
+}
 
 #[cfg(test)]
 mod tests {
@@ -232,5 +247,28 @@ mod tests {
         let fake_git = Git::with_path(path);
         let merged_branches = fake_git.merged_branches().unwrap();
         assert!(merged_branches.contains("already-been-merged"));
+    }
+
+    #[test]
+    fn can_issue_delete_statement() {
+        let path = String::from("./target/release/fake_git");
+        let fake_git = Git::with_path(path);
+        fake_git.delete_branch("already-been-merged").unwrap();
+    }
+
+    #[test]
+    fn identify_branches_for_deletion() {
+        let mut merged_branches = vec![
+            "  one",
+            "* two",
+            "  trunk",
+            "  three"
+        ].join("\n");
+        merged_branches.push_str("\n");
+
+        let pr_names = extract_deletable_branches(&merged_branches);
+        assert_eq!(pr_names.len(), 2);
+        assert_eq!(pr_names[0], "one");
+        assert_eq!(pr_names[1], "three");
     }
 }

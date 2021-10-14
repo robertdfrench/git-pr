@@ -80,11 +80,20 @@ fn can_list_all_branches() {
     assert!(branches.contains("trunk"));
 }
 
+// Cleaning PRs requires that we identify "old" branches (those which have been merged into trunk),
+// and that we delete those branches. Because the tests run in parallel, we need to ensure that our
+// check for the existence of the "hotfix" branch always happens *before* our attempt to delete the
+// "hotfix" branch. So this test case exercises all the git client functionality we would need in
+// order to implement the "pr-clean" subcommand.
 #[test]
-fn detect_merged_branches() {
+fn could_clean() {
     println!("TempDir='{:?}'", TEST_STATE.path());
 
     let git = Git::new();
     let branches = git.merged_branches().unwrap();
     assert!(branches.contains("hotfix"));
+
+    git.delete_branch("hotfix").unwrap();
+    let branches = git.all_branches().unwrap();
+    assert!(!branches.contains("hotfix"));
 }
