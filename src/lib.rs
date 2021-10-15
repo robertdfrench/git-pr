@@ -298,13 +298,13 @@ mod tests {
 
     #[test]
     fn identify_branches_for_deletion() {
-        let mut merged_branches = vec![
+        let merged_branches = vec![
             "  one",
             "* two",
             "  trunk",
-            "  three"
+            "  three",
+            ""
         ].join("\n");
-        merged_branches.push_str("\n");
 
         let pr_names = extract_deletable_branches(&merged_branches);
         assert_eq!(pr_names.len(), 2);
