@@ -54,9 +54,15 @@ lazy_static! {
     static ref TEST_STATE: TestState = TestState::new("git_pr_test");
 }
 
+macro_rules! init_test_state {
+    () => {
+        println!("TempDir='{:?}'", TEST_STATE.path());
+    };
+}
+
 #[test]
 fn version() {
-    println!("TempDir='{:?}'", TEST_STATE.path());
+    init_test_state!();
 
     let git = Git::new();
     let version = git.version().unwrap();
@@ -65,7 +71,7 @@ fn version() {
 
 #[test]
 fn fetch_and_prune() {
-    println!("TempDir='{:?}'", TEST_STATE.path());
+    init_test_state!();
 
     let git = Git::new();
     git.fetch_prune().unwrap();
@@ -73,7 +79,7 @@ fn fetch_and_prune() {
 
 #[test]
 fn can_list_all_branches() {
-    println!("TempDir='{:?}'", TEST_STATE.path());
+    init_test_state!();
 
     let git = Git::new();
     let branches = git.all_branches().unwrap();
@@ -87,7 +93,7 @@ fn can_list_all_branches() {
 // order to implement the "pr-clean" subcommand.
 #[test]
 fn could_clean() {
-    println!("TempDir='{:?}'", TEST_STATE.path());
+    init_test_state!();
 
     let git = Git::new();
     let branches = git.merged_branches().unwrap();
@@ -100,7 +106,7 @@ fn could_clean() {
 
 #[test]
 fn can_get_hash_of_head() {
-    println!("TempDir='{:?}'", TEST_STATE.path());
+    init_test_state!();
 
     // The hash will change every time, but this is one of the few git commands for which we can
     // know the exact length of the output. Weak, but best we can do until we add more capabilities
@@ -112,7 +118,7 @@ fn can_get_hash_of_head() {
 
 #[test]
 fn can_create_new_branch() {
-    println!("TempDir='{:?}'", TEST_STATE.path());
+    init_test_state!();
 
     // Show that we can create a new branch in this repo, and verify its existence by querying the
     // list of branches and showing that this new branch is among them.
