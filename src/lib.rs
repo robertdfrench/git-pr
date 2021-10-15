@@ -96,6 +96,14 @@ impl Git {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     }
 
+    /// Produce a list of PRs which are elligible for deletion.
+    pub fn merged_branches(&self) -> Result<String,GitError> {
+        let output = Command::new(&self.program).args(&["branch","--merged","trunk"]).output()?;
+        assert_success(output.status)?;
+
+        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    }
+
     /// Get the hash of the HEAD commit.
     ///
     /// This is useful for creating new PR branches, since we can use this value as a way to
@@ -116,6 +124,16 @@ impl Git {
     /// creating a branch and creating a pull request are the same operation!
     pub fn create_branch(&self, name: &str) -> Result<(), GitError> {
         let status = Command::new(&self.program).args(&["checkout","-b",name]).status()?;
+        assert_success(status)?;
+
+        Ok(())
+    }
+
+    /// Delete a branch
+    ///
+    /// Won't delete unmerged branches.
+    pub fn delete_branch(&self, name: &str) -> Result<(), GitError> {
+        let status = Command::new(&self.program).args(&["branch","-d",name]).status()?;
         assert_success(status)?;
 
         Ok(())
@@ -267,16 +285,14 @@ mod tests {
 
     #[test]
     fn can_detect_merged_branches() {
-        let path = String::from("./target/release/fake_git");
-        let fake_git = Git::with_path(path);
+        let fake_git = Git::with_path(crate_target!("fake_git"));
         let merged_branches = fake_git.merged_branches().unwrap();
         assert!(merged_branches.contains("already-been-merged"));
     }
 
     #[test]
     fn can_issue_delete_statement() {
-        let path = String::from("./target/release/fake_git");
-        let fake_git = Git::with_path(path);
+        let fake_git = Git::with_path(crate_target!("fake_git"));
         fake_git.delete_branch("already-been-merged").unwrap();
     }
 

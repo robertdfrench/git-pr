@@ -96,6 +96,7 @@ fn could_clean() {
     git.delete_branch("hotfix").unwrap();
     let branches = git.all_branches().unwrap();
     assert!(!branches.contains("hotfix"));
+}
 
 #[test]
 fn can_get_hash_of_head() {
