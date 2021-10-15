@@ -75,3 +75,27 @@ fn can_list_all_branches() {
     let branches = git.all_branches().unwrap();
     assert!(branches.contains("trunk"));
 }
+
+#[test]
+fn can_get_hash_of_head() {
+    println!("TempDir='{:?}'", TEST_STATE.path());
+
+    // The hash will change every time, but this is one of the few git commands for which we can
+    // know the exact length of the output. Weak, but best we can do until we add more capabilities
+    // to the client.
+    let git = Git::new();
+    let hash = git.rev_parse_head().unwrap();
+    assert_eq!(hash.len(), 7);
+}
+
+#[test]
+fn can_create_new_branch() {
+    println!("TempDir='{:?}'", TEST_STATE.path());
+
+    // Show that we can create a new branch in this repo, and verify its existence by querying the
+    // list of branches and showing that this new branch is among them.
+    let git = Git::new();
+    git.create_branch("knurt").unwrap();
+    let branches = git.all_branches().unwrap();
+    assert!(branches.contains("knurt"));
+}
