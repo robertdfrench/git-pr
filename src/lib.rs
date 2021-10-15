@@ -260,8 +260,7 @@ mod tests {
     // fake_git returns a constant, known hash, so we check for that.
     #[test]
     fn get_hash_of_current_commit() {
-        let path = String::from("./target/release/fake_git");
-        let fake_git = Git::with_path(path);
+        let fake_git = Git::with_path(crate_target!("fake_git"));
         let hash = fake_git.rev_parse_head().unwrap();
         assert_eq!(hash, "1234567");
     }
@@ -271,8 +270,7 @@ mod tests {
     // appropriate for an integration test with real git.
     #[test]
     fn create_new_branch() {
-        let path = String::from("./target/release/fake_git");
-        let fake_git = Git::with_path(path);
+        let fake_git = Git::with_path(crate_target!("fake_git"));
         fake_git.create_branch("hotfix").unwrap();
     }
 }
