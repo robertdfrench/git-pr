@@ -96,6 +96,14 @@ impl Git {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     }
 
+    /// Produce a list of PRs which are elligible for deletion.
+    pub fn merged_branches(&self) -> Result<String,GitError> {
+        let output = Command::new(&self.program).args(&["branch","--merged","trunk"]).output()?;
+        assert_success(output.status)?;
+
+        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    }
+
     /// Get the hash of the HEAD commit.
     ///
     /// This is useful for creating new PR branches, since we can use this value as a way to
@@ -116,6 +124,16 @@ impl Git {
     /// creating a branch and creating a pull request are the same operation!
     pub fn create_branch(&self, name: &str) -> Result<(), GitError> {
         let status = Command::new(&self.program).args(&["checkout","-b",name]).status()?;
+        assert_success(status)?;
+
+        Ok(())
+    }
+
+    /// Delete a branch
+    ///
+    /// Won't delete unmerged branches.
+    pub fn delete_branch(&self, name: &str) -> Result<(), GitError> {
+        let status = Command::new(&self.program).args(&["branch","-d",name]).status()?;
         assert_success(status)?;
 
         Ok(())
@@ -175,6 +193,14 @@ pub fn extract_pr_names(branches: &str) -> Vec<String> {
     pr_names
 }
 
+pub fn extract_deletable_branches(branches: &str) -> Vec<String> {
+    branches.lines()
+        .filter(|b| !b.starts_with("*")) // skip the current branch
+        .map(|b| b.trim_start()) // remove left-hand gutter characters
+        .map(|b| b.trim_end()) // remove newlines
+        .filter(|b| *b != "trunk")
+        .map(|b| b.to_string()).collect()
+}
 
 #[cfg(test)]
 mod tests {
@@ -255,6 +281,35 @@ mod tests {
         assert_eq!(pr_names[1], "second");
         assert_eq!(pr_names[2], "dabba/doo/third");
         assert_eq!(pr_names[3], "fourth");
+    }
+
+    #[test]
+    fn can_detect_merged_branches() {
+        let fake_git = Git::with_path(crate_target!("fake_git"));
+        let merged_branches = fake_git.merged_branches().unwrap();
+        assert!(merged_branches.contains("already-been-merged"));
+    }
+
+    #[test]
+    fn can_issue_delete_statement() {
+        let fake_git = Git::with_path(crate_target!("fake_git"));
+        fake_git.delete_branch("already-been-merged").unwrap();
+    }
+
+    #[test]
+    fn identify_branches_for_deletion() {
+        let merged_branches = vec![
+            "  one",
+            "* two",
+            "  trunk",
+            "  three",
+            ""
+        ].join("\n");
+
+        let pr_names = extract_deletable_branches(&merged_branches);
+        assert_eq!(pr_names.len(), 2);
+        assert_eq!(pr_names[0], "one");
+        assert_eq!(pr_names[1], "three");
     }
 
     // fake_git returns a constant, known hash, so we check for that.
