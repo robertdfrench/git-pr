@@ -176,13 +176,21 @@ mod tests {
         }
     }
 
+    macro_rules! crate_target {
+        ($name:expr) => {
+            match cfg!(debug_assertions) {
+                true => format!("./target/debug/{}", $name),
+                false => format!("./target/release/{}", $name),
+            }
+        };
+    }
+
     // Verify that we out Git "client" can query the underlying git for its version info. The
     // `fake_git` program (defined in src/bin/fake_git.rs) will respond with a known string if
     // invoked with the "--version" argument.
     #[test]
     fn query_version_info() {
-        let path = String::from("./target/release/fake_git");
-        let fake_git = Git::with_path(path);
+        let fake_git = Git::with_path(crate_target!("fake_git"));
         let version = fake_git.version().unwrap();
         assert!(version.starts_with("fake_git version 1"));
     }
@@ -195,8 +203,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn query_version_failure() {
-        let path = String::from("./target/release/failing_git");
-        let failing_git = Git::with_path(path);
+        let failing_git = Git::with_path(crate_target!("failing_git"));
         failing_git.version().unwrap();
     }
 
