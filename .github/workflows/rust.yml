@@ -17,7 +17,7 @@ jobs:
     steps:
     - name: CheckoutRepo
       uses: actions/checkout@v2
-    - name: Build
-      run: cargo build --release
-    - name: Test
+    - name: Debug
+      run: RUST_BACKTRACE=1 cargo test
+    - name: Release
       run: RUST_BACKTRACE=1 cargo test --release
