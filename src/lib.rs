@@ -96,15 +96,36 @@ impl Git {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     }
 
-    pub fn merged_branches(&self) -> Result<String,GitError> {
-        let output = Command::new(&self.program).args(&["branch","--merged"]).output()?;
+    /// Get the hash of the HEAD commit.
+    ///
+    /// This is useful for creating new PR branches, since we can use this value as a way to
+    /// indicate the "base" of the current work. This function takes advantage of the `core.abbrev`
+    /// config value, and will return a hash of the indicated length. If this value is not
+    /// specificed, git will return the shortest hash necessary to uniquely identify the commit.
+    pub fn rev_parse_head(&self) -> Result<String,GitError> {
+        let output = Command::new(&self.program).args(&["rev-parse","--short","HEAD"]).output()?;
         assert_success(output.status)?;
 
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+        Ok(String::from_utf8_lossy(&output.stdout).trim_end().to_string())
     }
 
-    pub fn delete_branch(&self, branch_name: &str) -> Result<(),GitError> {
-        let status = Command::new(&self.program).args(&["branch","-d",branch_name]).status()?;
+    /// Create a new branch
+    ///
+    /// Used with [`rev_parse_head`] as part of the `git-pr-create` tool. Pull requests are
+    /// expressed as branches with a certain naming pattern (`pr-name/hash`). So in our system,
+    /// creating a branch and creating a pull request are the same operation!
+    pub fn create_branch(&self, name: &str) -> Result<(), GitError> {
+        let status = Command::new(&self.program).args(&["checkout","-b",name]).status()?;
+        assert_success(status)?;
+
+        Ok(())
+    }
+
+    /// Push a branch to `origin` and set upstream tracking
+    ///
+    /// Used in `git-pr-create` to notify other developers that a new PR has been created.
+    pub fn push_upstream(&self, name: &str) -> Result<(), GitError> {
+        let status = Command::new(&self.program).args(&["push","-u","origin",name]).status()?;
         assert_success(status)?;
 
         Ok(())
@@ -273,5 +294,22 @@ mod tests {
         assert_eq!(pr_names.len(), 2);
         assert_eq!(pr_names[0], "one");
         assert_eq!(pr_names[1], "three");
+    }
+
+    // fake_git returns a constant, known hash, so we check for that.
+    #[test]
+    fn get_hash_of_current_commit() {
+        let fake_git = Git::with_path(crate_target!("fake_git"));
+        let hash = fake_git.rev_parse_head().unwrap();
+        assert_eq!(hash, "1234567");
+    }
+
+    // We call `create_branch` to ensure it doesn't throw an error, but we don't have enough
+    // tooling in `fake_git` to warrant checking for a change in state afterwards -- this is more
+    // appropriate for an integration test with real git.
+    #[test]
+    fn create_new_branch() {
+        let fake_git = Git::with_path(crate_target!("fake_git"));
+        fake_git.create_branch("hotfix").unwrap();
     }
 }
