@@ -1,8 +1,6 @@
 //! Pull request management for bare repos
 
 
-use lazy_static::lazy_static; // Suggested by regex crate docs. We use this to compile regexes at
-                              // source code compile-time, saving crucial picoseconds at runtime.
 use regex::Regex;
 use std::io;
 use std::process::Command;
@@ -118,17 +116,15 @@ impl Git {
 /// * must end with one or more digits
 pub fn extract_pr_names(branches: &str) -> Vec<String> {
 
-    // Compile regexes at compile time, rather than compiling them at runtime every time this
-    // function is invoked. Honestly, this might be overkill.
-    lazy_static! {
-        static ref BEGINS_WITH_REMOTE_REF: Regex = Regex::new(r"^ *\** remotes/[^/]+/").unwrap();
-        static ref ENDS_WITH_DIGIT: Regex = Regex::new(r"/\d+$").unwrap();
-    }
+    // It's okay to call `.unwrap()` here, because we know that the regexes compile as long as the
+    // "parse_branches_into_pr_list" unit test passes.
+    let begins_with_remote_ref: Regex = Regex::new(r"^ *\** remotes/[^/]+/").unwrap();
+    let ends_with_digit: Regex = Regex::new(r"/\d+$").unwrap();
 
     // Select any branches which match *both* of the regexes defined above.
     let pr_branches: Vec<&str> = branches.lines()
-        .filter(|b| BEGINS_WITH_REMOTE_REF.is_match(b))
-        .filter(|b| ENDS_WITH_DIGIT.is_match(b))
+        .filter(|b| begins_with_remote_ref.is_match(b))
+        .filter(|b| ends_with_digit.is_match(b))
         .collect();
 
     // Transform each branch "remotes/origin/blah/N" into a PR Name: "blah".  This has some
@@ -136,8 +132,8 @@ pub fn extract_pr_names(branches: &str) -> Vec<String> {
     // https://github.com/robertdfrench/git-pr/issues/7 .
     let mut pr_names = vec![];
     for branch in pr_branches {
-        let branch = BEGINS_WITH_REMOTE_REF.replace_all(&branch, "");
-        let branch = ENDS_WITH_DIGIT.replace_all(&branch, "");
+        let branch = begins_with_remote_ref.replace_all(&branch, "");
+        let branch = ends_with_digit.replace_all(&branch, "");
         pr_names.push(branch.to_string())
     }
 
