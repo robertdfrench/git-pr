@@ -171,7 +171,7 @@ pub fn extract_pr_names(branches: &str) -> Vec<String> {
 
     // It's okay to call `.unwrap()` here, because we know that the regexes compile as long as the
     // "parse_branches_into_pr_list" unit test passes.
-    let begins_with_remote_ref: Regex = Regex::new(r"^ *\** remotes/[^/]+/").unwrap();
+    let begins_with_remote_ref: Regex = Regex::new(r"^ *\** remotes/origin/").unwrap();
     let ends_with_digit: Regex = Regex::new(r"/\d+$").unwrap();
 
     // Select any branches which match *both* of the regexes defined above.
@@ -263,24 +263,6 @@ mod tests {
         assert_eq!(pr_names.len(), 2);
         assert_eq!(pr_names[0], "first-pr");
         assert_eq!(pr_names[1], "second");
-    }
-
-    // Show that we can extract a list of pr names even when the remote is not "origin"
-    #[test]
-    fn parse_branches_from_custom_remotes() {
-        let branches: &'static str = "
-          remotes/yabba-dabba-doo/first-pr/0
-          remotes/yabba{dabba}doo/second/0
-          remotes/yabba/dabba/doo/third/0
-          remotes/yabba dabba doo/fourth/0
-        ";
-
-        let pr_names = extract_pr_names(branches);
-        assert_eq!(pr_names.len(), 4);
-        assert_eq!(pr_names[0], "first-pr");
-        assert_eq!(pr_names[1], "second");
-        assert_eq!(pr_names[2], "dabba/doo/third");
-        assert_eq!(pr_names[3], "fourth");
     }
 
     #[test]
