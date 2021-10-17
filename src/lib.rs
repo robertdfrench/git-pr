@@ -1,8 +1,6 @@
 //! Pull request management for bare repos
 
 
-use lazy_static::lazy_static; // Suggested by regex crate docs. We use this to compile regexes at
-                              // source code compile-time, saving crucial picoseconds at runtime.
 use regex::Regex;
 use std::io;
 use std::process::Command;
@@ -97,6 +95,41 @@ impl Git {
 
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     }
+
+    /// Get the hash of the HEAD commit.
+    ///
+    /// This is useful for creating new PR branches, since we can use this value as a way to
+    /// indicate the "base" of the current work. This function takes advantage of the `core.abbrev`
+    /// config value, and will return a hash of the indicated length. If this value is not
+    /// specificed, git will return the shortest hash necessary to uniquely identify the commit.
+    pub fn rev_parse_head(&self) -> Result<String,GitError> {
+        let output = Command::new(&self.program).args(&["rev-parse","--short","HEAD"]).output()?;
+        assert_success(output.status)?;
+
+        Ok(String::from_utf8_lossy(&output.stdout).trim_end().to_string())
+    }
+
+    /// Create a new branch
+    ///
+    /// Used with [`rev_parse_head`] as part of the `git-pr-create` tool. Pull requests are
+    /// expressed as branches with a certain naming pattern (`pr-name/hash`). So in our system,
+    /// creating a branch and creating a pull request are the same operation!
+    pub fn create_branch(&self, name: &str) -> Result<(), GitError> {
+        let status = Command::new(&self.program).args(&["checkout","-b",name]).status()?;
+        assert_success(status)?;
+
+        Ok(())
+    }
+
+    /// Push a branch to `origin` and set upstream tracking
+    ///
+    /// Used in `git-pr-create` to notify other developers that a new PR has been created.
+    pub fn push_upstream(&self, name: &str) -> Result<(), GitError> {
+        let status = Command::new(&self.program).args(&["push","-u","origin",name]).status()?;
+        assert_success(status)?;
+
+        Ok(())
+    }
 }
 
 
@@ -118,17 +151,15 @@ impl Git {
 /// * must end with one or more digits
 pub fn extract_pr_names(branches: &str) -> Vec<String> {
 
-    // Compile regexes at compile time, rather than compiling them at runtime every time this
-    // function is invoked. Honestly, this might be overkill.
-    lazy_static! {
-        static ref BEGINS_WITH_REMOTE_REF: Regex = Regex::new(r"^ *\** remotes/[^/]+/").unwrap();
-        static ref ENDS_WITH_DIGIT: Regex = Regex::new(r"/\d+$").unwrap();
-    }
+    // It's okay to call `.unwrap()` here, because we know that the regexes compile as long as the
+    // "parse_branches_into_pr_list" unit test passes.
+    let begins_with_remote_ref: Regex = Regex::new(r"^ *\** remotes/[^/]+/").unwrap();
+    let ends_with_digit: Regex = Regex::new(r"/\d+$").unwrap();
 
     // Select any branches which match *both* of the regexes defined above.
     let pr_branches: Vec<&str> = branches.lines()
-        .filter(|b| BEGINS_WITH_REMOTE_REF.is_match(b))
-        .filter(|b| ENDS_WITH_DIGIT.is_match(b))
+        .filter(|b| begins_with_remote_ref.is_match(b))
+        .filter(|b| ends_with_digit.is_match(b))
         .collect();
 
     // Transform each branch "remotes/origin/blah/N" into a PR Name: "blah".  This has some
@@ -136,8 +167,8 @@ pub fn extract_pr_names(branches: &str) -> Vec<String> {
     // https://github.com/robertdfrench/git-pr/issues/7 .
     let mut pr_names = vec![];
     for branch in pr_branches {
-        let branch = BEGINS_WITH_REMOTE_REF.replace_all(&branch, "");
-        let branch = ENDS_WITH_DIGIT.replace_all(&branch, "");
+        let branch = begins_with_remote_ref.replace_all(&branch, "");
+        let branch = ends_with_digit.replace_all(&branch, "");
         pr_names.push(branch.to_string())
     }
 
@@ -158,13 +189,21 @@ mod tests {
         }
     }
 
+    macro_rules! crate_target {
+        ($name:expr) => {
+            match cfg!(debug_assertions) {
+                true => format!("./target/debug/{}", $name),
+                false => format!("./target/release/{}", $name),
+            }
+        };
+    }
+
     // Verify that we out Git "client" can query the underlying git for its version info. The
     // `fake_git` program (defined in src/bin/fake_git.rs) will respond with a known string if
     // invoked with the "--version" argument.
     #[test]
     fn query_version_info() {
-        let path = String::from("./target/release/fake_git");
-        let fake_git = Git::with_path(path);
+        let fake_git = Git::with_path(crate_target!("fake_git"));
         let version = fake_git.version().unwrap();
         assert!(version.starts_with("fake_git version 1"));
     }
@@ -177,8 +216,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn query_version_failure() {
-        let path = String::from("./target/release/failing_git");
-        let failing_git = Git::with_path(path);
+        let failing_git = Git::with_path(crate_target!("failing_git"));
         failing_git.version().unwrap();
     }
 
@@ -217,5 +255,22 @@ mod tests {
         assert_eq!(pr_names[1], "second");
         assert_eq!(pr_names[2], "dabba/doo/third");
         assert_eq!(pr_names[3], "fourth");
+    }
+
+    // fake_git returns a constant, known hash, so we check for that.
+    #[test]
+    fn get_hash_of_current_commit() {
+        let fake_git = Git::with_path(crate_target!("fake_git"));
+        let hash = fake_git.rev_parse_head().unwrap();
+        assert_eq!(hash, "1234567");
+    }
+
+    // We call `create_branch` to ensure it doesn't throw an error, but we don't have enough
+    // tooling in `fake_git` to warrant checking for a change in state afterwards -- this is more
+    // appropriate for an integration test with real git.
+    #[test]
+    fn create_new_branch() {
+        let fake_git = Git::with_path(crate_target!("fake_git"));
+        fake_git.create_branch("hotfix").unwrap();
     }
 }
