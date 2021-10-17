@@ -1,6 +1,8 @@
 //! Pull request management for bare repos
 
 
+use lazy_static::lazy_static; // Suggested by regex crate docs. We use this to compile regexes at
+                              // source code compile-time, saving crucial picoseconds at runtime.
 use regex::Regex;
 use std::io;
 use std::process::Command;
@@ -95,20 +97,6 @@ impl Git {
 
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     }
-
-    pub fn merged_branches(&self) -> Result<String,GitError> {
-        let output = Command::new(&self.program).args(&["branch","--merged"]).output()?;
-        assert_success(output.status)?;
-
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
-    }
-
-    pub fn delete_branch(&self, branch_name: &str) -> Result<(),GitError> {
-        let status = Command::new(&self.program).args(&["branch","-d",branch_name]).status()?;
-        assert_success(status)?;
-
-        Ok(())
-    }
 }
 
 
@@ -130,15 +118,17 @@ impl Git {
 /// * must end with one or more digits
 pub fn extract_pr_names(branches: &str) -> Vec<String> {
 
-    // It's okay to call `.unwrap()` here, because we know that the regexes compile as long as the
-    // "parse_branches_into_pr_list" unit test passes.
-    let begins_with_remote_ref: Regex = Regex::new(r"^ *\** remotes/[^/]+/").unwrap();
-    let ends_with_digit: Regex = Regex::new(r"/\d+$").unwrap();
+    // Compile regexes at compile time, rather than compiling them at runtime every time this
+    // function is invoked. Honestly, this might be overkill.
+    lazy_static! {
+        static ref BEGINS_WITH_REMOTE_REF: Regex = Regex::new(r"^ *\** remotes/[^/]+/").unwrap();
+        static ref ENDS_WITH_DIGIT: Regex = Regex::new(r"/\d+$").unwrap();
+    }
 
     // Select any branches which match *both* of the regexes defined above.
     let pr_branches: Vec<&str> = branches.lines()
-        .filter(|b| begins_with_remote_ref.is_match(b))
-        .filter(|b| ends_with_digit.is_match(b))
+        .filter(|b| BEGINS_WITH_REMOTE_REF.is_match(b))
+        .filter(|b| ENDS_WITH_DIGIT.is_match(b))
         .collect();
 
     // Transform each branch "remotes/origin/blah/N" into a PR Name: "blah".  This has some
@@ -146,22 +136,14 @@ pub fn extract_pr_names(branches: &str) -> Vec<String> {
     // https://github.com/robertdfrench/git-pr/issues/7 .
     let mut pr_names = vec![];
     for branch in pr_branches {
-        let branch = begins_with_remote_ref.replace_all(&branch, "");
-        let branch = ends_with_digit.replace_all(&branch, "");
+        let branch = BEGINS_WITH_REMOTE_REF.replace_all(&branch, "");
+        let branch = ENDS_WITH_DIGIT.replace_all(&branch, "");
         pr_names.push(branch.to_string())
     }
 
     pr_names
 }
 
-pub fn extract_deletable_branches(branches: &str) -> Vec<String> {
-    branches.lines()
-        .filter(|b| !b.starts_with("*")) // skip the current branch
-        .map(|b| b.trim_start()) // remove left-hand gutter characters
-        .map(|b| b.trim_end()) // remove newlines
-        .filter(|b| *b != "trunk")
-        .map(|b| b.to_string()).collect()
-}
 
 #[cfg(test)]
 mod tests {
@@ -176,21 +158,13 @@ mod tests {
         }
     }
 
-    macro_rules! crate_target {
-        ($name:expr) => {
-            match cfg!(debug_assertions) {
-                true => format!("./target/debug/{}", $name),
-                false => format!("./target/release/{}", $name),
-            }
-        };
-    }
-
     // Verify that we out Git "client" can query the underlying git for its version info. The
     // `fake_git` program (defined in src/bin/fake_git.rs) will respond with a known string if
     // invoked with the "--version" argument.
     #[test]
     fn query_version_info() {
-        let fake_git = Git::with_path(crate_target!("fake_git"));
+        let path = String::from("./target/release/fake_git");
+        let fake_git = Git::with_path(path);
         let version = fake_git.version().unwrap();
         assert!(version.starts_with("fake_git version 1"));
     }
@@ -203,7 +177,8 @@ mod tests {
     #[test]
     #[should_panic]
     fn query_version_failure() {
-        let failing_git = Git::with_path(crate_target!("failing_git"));
+        let path = String::from("./target/release/failing_git");
+        let failing_git = Git::with_path(path);
         failing_git.version().unwrap();
     }
 
@@ -242,36 +217,5 @@ mod tests {
         assert_eq!(pr_names[1], "second");
         assert_eq!(pr_names[2], "dabba/doo/third");
         assert_eq!(pr_names[3], "fourth");
-    }
-
-    #[test]
-    fn can_detect_merged_branches() {
-        let path = String::from("./target/release/fake_git");
-        let fake_git = Git::with_path(path);
-        let merged_branches = fake_git.merged_branches().unwrap();
-        assert!(merged_branches.contains("already-been-merged"));
-    }
-
-    #[test]
-    fn can_issue_delete_statement() {
-        let path = String::from("./target/release/fake_git");
-        let fake_git = Git::with_path(path);
-        fake_git.delete_branch("already-been-merged").unwrap();
-    }
-
-    #[test]
-    fn identify_branches_for_deletion() {
-        let mut merged_branches = vec![
-            "  one",
-            "* two",
-            "  trunk",
-            "  three"
-        ].join("\n");
-        merged_branches.push_str("\n");
-
-        let pr_names = extract_deletable_branches(&merged_branches);
-        assert_eq!(pr_names.len(), 2);
-        assert_eq!(pr_names[0], "one");
-        assert_eq!(pr_names[1], "three");
     }
 }
