@@ -15,13 +15,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: GitVersion
-      run: git --version
     - name: CheckoutRepo
       uses: actions/checkout@v2
-    - name: PrepareRepo
-      run: git switch -c "pull-request"
     - name: Build
       run: cargo build --release
     - name: Test
-      run: RUST_BACKTRACE=full cargo test --release -- --nocapture
+      run: RUST_BACKTRACE=1 cargo test --release
