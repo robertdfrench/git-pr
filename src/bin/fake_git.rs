@@ -25,6 +25,19 @@ fn main() {
         // No input given
         None => exit(1),
 
+        Some("-C") => match argv!(2) {
+            None => exit(1),
+            Some(_) => match argv!(3) {
+                None => exit(1),
+
+                // git --version
+                Some("--version") => println!("fake_git version 1"),
+
+                // unrecognized input
+                Some(_) => exit(1)
+            }
+        },
+
         // git checkout -b <anything>
         Some("checkout") => match argv!(2) {
             None => exit(1),
@@ -60,8 +73,6 @@ fn main() {
             Some(_) => exit(1)
         },
 
-        // git --version
-        Some("--version") => println!("fake_git version 1"),
         Some("branch") => match argv!(2) {
             None => exit(1),
             Some("-d") => match argv!(3) {

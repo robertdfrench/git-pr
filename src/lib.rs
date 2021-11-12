@@ -3,6 +3,7 @@
 
 use regex::Regex;
 use std::io;
+use std::path::Path;
 use std::process::Command;
 use std::process::ExitStatus;
 
@@ -13,13 +14,16 @@ use std::process::ExitStatus;
 /// It provides only those features that we need from git in order to set up our PR workflow. It is
 /// intentionally bare-bones: for testing purposes, we want to do as much logic as possible without
 /// relying on an external tool or service. 
-#[derive(Debug)]
 pub struct Git {
     // The path to the version of git we'd like to use. Nominally, this would always be "git", but
     // we allow it to be specified in tests (see the unit tests for this module) so that we can
     // test some functionality against mock implementations of git. This makes it easier to
     // exercise edge cases without having to make real git jump through hoops.
     program: String,
+
+    // Path to the repository. This is `.` by default in production, but for tests we want to be
+    // able to invoke git as though we were in a temporary, test-specific directory.
+    working_dir: Box<dyn AsRef<Path>>,
 }
 
 
@@ -57,7 +61,7 @@ impl Git {
     /// This will rely on the operating system to infer the appropriate path to git, based on the
     /// current environment (just like your shell does it).
     pub fn new() -> Git {
-        Git{ program: String::from("git") }
+        Git{ program: String::from("git"), working_dir: Box::new(String::from(".")) }
     }
 
     /// Report the version of the underlying git binary.
@@ -66,7 +70,9 @@ impl Git {
     /// to users of `git-pr` may help them begin to debug unexpected issues; For example, `git-pr`
     /// may not work correctly with very old versions of git.
     pub fn version(&self) -> Result<String,GitError> {
-        let output = Command::new(&self.program).arg("--version").output()?;
+        let output = Command::new(&self.program)
+            .arg("-C").arg(self.working_dir.as_ref().as_ref())
+            .arg("--version").output()?;
         assert_success(output.status)?;
 
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
@@ -90,7 +96,9 @@ impl Git {
     /// references to remote branches. It is from this list that we can produce the list of
     /// "current PRs".
     pub fn all_branches(&self) -> Result<String,GitError> {
-        let output = Command::new(&self.program).args(&["branch","-a"]).output()?;
+        let output = Command::new(&self.program)
+            .arg("-C").arg(self.working_dir.as_ref().as_ref())
+            .args(&["branch","-a"]).output()?;
         assert_success(output.status)?;
 
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
@@ -204,14 +212,25 @@ pub fn extract_deletable_branches(branches: &str) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
+    use std::process::Stdio;
     use super::*;
+    use tempdir::TempDir;
 
     // Implementing this above produces a warning, since the function is (by design) never used by
     // other application code. Since it is only used in this module, we implement this function
     // local to this module, thus eliminating the dead code warning.
     impl Git {
         fn with_path(path: String) -> Git {
-            Git{ program: path }
+            let working_dir = Box::new(TempDir::new("git-pr").unwrap());
+
+            // git init in new unique dir
+            let status = Command::new("git")
+                .stdout(Stdio::null())
+                .arg("-C").arg(working_dir.as_ref().as_ref())
+                .args(&["init"]).status().unwrap();
+            assert!(status.success());
+
+            Git{ program: path, working_dir }
         }
     }
 
