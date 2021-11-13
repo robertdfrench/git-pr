@@ -84,7 +84,9 @@ impl Git {
     /// local references to any that have been deleted. This ensures that the user is able to see
     /// the same set of "current PRs" as their collaborators.
     pub fn fetch_prune(&self) -> Result<(),GitError> {
-        let status = Command::new(&self.program).args(&["fetch","--prune"]).status()?;
+        let status = Command::new(&self.program)
+            .arg("-C").arg(self.working_dir.as_ref().as_ref())
+            .args(&["fetch","--prune"]).status()?;
         assert_success(status)?;
 
         Ok(())
