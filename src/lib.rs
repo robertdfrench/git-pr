@@ -123,7 +123,9 @@ impl Git {
     /// config value, and will return a hash of the indicated length. If this value is not
     /// specificed, git will return the shortest hash necessary to uniquely identify the commit.
     pub fn rev_parse_head(&self) -> Result<String,GitError> {
-        let output = Command::new(&self.program).args(&["rev-parse","--short","HEAD"]).output()?;
+        let output = Command::new(&self.program)
+            .arg("-C").arg(self.working_dir.as_ref().as_ref())
+            .args(&["rev-parse","--short","HEAD"]).output()?;
         assert_success(output.status)?;
 
         Ok(String::from_utf8_lossy(&output.stdout).trim_end().to_string())
