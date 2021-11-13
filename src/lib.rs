@@ -137,7 +137,9 @@ impl Git {
     /// expressed as branches with a certain naming pattern (`pr-name/hash`). So in our system,
     /// creating a branch and creating a pull request are the same operation!
     pub fn create_branch(&self, name: &str) -> Result<(), GitError> {
-        let status = Command::new(&self.program).args(&["checkout","-b",name]).status()?;
+        let status = Command::new(&self.program)
+            .arg("-C").arg(self.working_dir.as_ref().as_ref())
+            .args(&["checkout","-b",name]).status()?;
         assert_success(status)?;
 
         Ok(())
@@ -147,7 +149,9 @@ impl Git {
     ///
     /// Won't delete unmerged branches.
     pub fn delete_branch(&self, name: &str) -> Result<(), GitError> {
-        let status = Command::new(&self.program).args(&["branch","-d",name]).status()?;
+        let status = Command::new(&self.program)
+            .arg("-C").arg(self.working_dir.as_ref().as_ref())
+            .args(&["branch","-d",name]).status()?;
         assert_success(status)?;
 
         Ok(())

@@ -33,10 +33,29 @@ fn main() {
                 // git --version
                 Some("--version") => println!("fake_git version 1"),
 
-                // git branch --merged
+                // git branch ...
                 Some("branch") => match argv!(4) {
                     None => exit(1),
+
+                    // git branch --merged
                     Some("--merged") => println!("* trunk\nalready-been-merged"),
+
+                    // git branch -d already-been-merged
+                    Some("-d") => match argv!(5) {
+                        None => exit(1),
+                        Some("already-been-merged") => exit(0),
+                        Some(_) => exit(1)
+                    },
+                    Some(_) => exit(1)
+                },
+
+                // git checkout -b <anything>
+                Some("checkout") => match argv!(4) {
+                    None => exit(1),
+                    Some("-b") => match argv!(5) {
+                        None => exit(1),
+                        Some(_) => exit(0) // Any argument will do, return 0
+                    },
                     Some(_) => exit(1)
                 },
 
@@ -56,16 +75,6 @@ fn main() {
             }
         },
 
-        // git checkout -b <anything>
-        Some("checkout") => match argv!(2) {
-            None => exit(1),
-            Some("-b") => match argv!(3) {
-                None => exit(1),
-                Some(_) => exit(0) // Any argument will do, return 0
-            },
-            Some(_) => exit(1)
-        },
-
         // git push -u origin <anything>
         Some("push") => match argv!(2) {
             None => exit(1),
@@ -80,15 +89,6 @@ fn main() {
             Some(_) => exit(1)
         },
 
-        Some("branch") => match argv!(2) {
-            None => exit(1),
-            Some("-d") => match argv!(3) {
-                None => exit(1),
-                Some("already-been-merged") => exit(0),
-                Some(_) => exit(1)
-            },
-            Some(_) => exit(1)
-        }
         // unrecognized input
         Some(_) => exit(1)
     };
