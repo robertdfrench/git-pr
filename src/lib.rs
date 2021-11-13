@@ -19,11 +19,11 @@ pub struct Git {
     // we allow it to be specified in tests (see the unit tests for this module) so that we can
     // test some functionality against mock implementations of git. This makes it easier to
     // exercise edge cases without having to make real git jump through hoops.
-    program: String,
+    pub program: String,
 
     // Path to the repository. This is `.` by default in production, but for tests we want to be
     // able to invoke git as though we were in a temporary, test-specific directory.
-    working_dir: Box<dyn AsRef<Path>>,
+    pub working_dir: Box<dyn AsRef<Path>>,
 }
 
 
@@ -161,7 +161,9 @@ impl Git {
     ///
     /// Used in `git-pr-create` to notify other developers that a new PR has been created.
     pub fn push_upstream(&self, name: &str) -> Result<(), GitError> {
-        let status = Command::new(&self.program).args(&["push","-u","origin",name]).status()?;
+        let status = Command::new(&self.program)
+            .arg("-C").arg(self.working_dir.as_ref().as_ref())
+            .args(&["push","-u","origin",name]).status()?;
         assert_success(status)?;
 
         Ok(())
@@ -222,23 +224,14 @@ pub fn extract_deletable_branches(branches: &str) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-    use std::process::Stdio;
     use super::*;
-    use tempdir::TempDir;
 
     // Implementing this above produces a warning, since the function is (by design) never used by
     // other application code. Since it is only used in this module, we implement this function
     // local to this module, thus eliminating the dead code warning.
     impl Git {
         fn with_path(path: String) -> Git {
-            let working_dir = Box::new(TempDir::new("git-pr").unwrap());
-
-            // git init in new unique dir
-            let status = Command::new("git")
-                .stdout(Stdio::null())
-                .arg("-C").arg(working_dir.as_ref().as_ref())
-                .args(&["init"]).status().unwrap();
-            assert!(status.success());
+            let working_dir = Box::new(".");
 
             Git{ program: path, working_dir }
         }
