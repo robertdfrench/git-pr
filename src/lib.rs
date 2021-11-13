@@ -108,7 +108,9 @@ impl Git {
 
     /// Produce a list of PRs which are elligible for deletion.
     pub fn merged_branches(&self) -> Result<String,GitError> {
-        let output = Command::new(&self.program).args(&["branch","--merged","trunk"]).output()?;
+        let output = Command::new(&self.program)
+            .arg("-C").arg(self.working_dir.as_ref().as_ref())
+            .args(&["branch","--merged","trunk"]).output()?;
         assert_success(output.status)?;
 
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
