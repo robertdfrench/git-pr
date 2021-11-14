@@ -106,6 +106,26 @@ impl Git {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     }
 
+    /// Produce a list of local branch names.
+    ///
+    /// This asks the configured `git` binary to produce a list of local branches
+    pub fn all_local_branches(&self) -> Result<String,GitError> {
+        let output = Command::new(&self.program).args(&["branch"]).output()?;
+        assert_success(output.status)?;
+
+        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    }
+
+    /// Produce a list of remote branch names.
+    ///
+    /// This asks the configured `git` binary to produce a list of remote branches
+    pub fn all_remote_branches(&self) -> Result<String,GitError> {
+        let output = Command::new(&self.program).args(&["branch","-r"]).output()?;
+        assert_success(output.status)?;
+
+        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    }
+
     /// Produce a list of PRs which are elligible for deletion.
     pub fn merged_branches(&self) -> Result<String,GitError> {
         let output = Command::new(&self.program)
@@ -116,7 +136,6 @@ impl Git {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     }
 
-    /// Get the hash of the HEAD commit.
     ///
     /// This is useful for creating new PR branches, since we can use this value as a way to
     /// indicate the "base" of the current work. This function takes advantage of the `core.abbrev`
@@ -157,6 +176,14 @@ impl Git {
         Ok(())
     }
 
+    /// Force delete a branch
+    pub fn force_delete_branch(&self, name: &str) -> Result<(), GitError> {
+        let status = Command::new(&self.program).args(&["branch","-D",name]).status()?;
+        assert_success(status)?;
+
+        Ok(())
+    }
+
     /// Push a branch to `origin` and set upstream tracking
     ///
     /// Used in `git-pr-create` to notify other developers that a new PR has been created.
@@ -164,6 +191,16 @@ impl Git {
         let status = Command::new(&self.program)
             .arg("-C").arg(self.working_dir.as_ref().as_ref())
             .args(&["push","-u","origin",name]).status()?;
+        assert_success(status)?;
+
+        Ok(())
+    }
+
+    /// Delete a branch on `origin`
+    ///
+    /// Used in `git-pr-abandon` to remove a remote branch.
+    pub fn push_delete(&self, name: &str) -> Result<(), GitError> {
+        let status = Command::new(&self.program).args(&["push","origin","--delete",name]).status()?;
         assert_success(status)?;
 
         Ok(())
@@ -213,6 +250,31 @@ pub fn extract_pr_names(branches: &str) -> Vec<String> {
     pr_names
 }
 
+/// Filter remote branches given a pr-name
+///
+/// Should be called with output of "git.all_remote_branches"
+pub fn filter_remote_branches(pr_name: &str, branches: &str) -> Vec<String> {
+    branches.lines()
+        .map(|b| b.trim_start_matches("  origin/"))
+        .map(|b| b.trim_end()) // remove newlines
+        .filter(|b| b.starts_with(pr_name))
+        .map(|b| b.to_string()).collect()
+}
+
+/// Filter local branches given a pr-name
+///
+/// Should be called with output of "git.all_local_branches"
+pub fn filter_local_branches(pr_name: &str, branches: &str) -> Vec<String> {
+    extract_deletable_branches(branches)
+        .iter()
+        .filter(|b| b.starts_with(pr_name))
+        .map(|b| b.to_string()).collect()
+}
+
+/// Get deletable branches
+///
+/// Should be called with output of "git.merged_branches" or
+/// "git.all_local_branches"
 pub fn extract_deletable_branches(branches: &str) -> Vec<String> {
     branches.lines()
         .filter(|b| !b.starts_with("*")) // skip the current branch
