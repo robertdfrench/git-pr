@@ -186,18 +186,18 @@ impl Git {
 /// criteria for pull request names is:
 ///
 /// * must begin with "remotes/origin/"
-/// * must end with one or more digits
+/// * must end with one or more hex digits
 pub fn extract_pr_names(branches: &str) -> Vec<String> {
 
     // It's okay to call `.unwrap()` here, because we know that the regexes compile as long as the
     // "parse_branches_into_pr_list" unit test passes.
     let begins_with_remote_ref: Regex = Regex::new(r"^ *\** remotes/origin/").unwrap();
-    let ends_with_digit: Regex = Regex::new(r"/\d+$").unwrap();
+    let ends_with_hex: Regex = Regex::new(r"/[a-f\d]+$").unwrap();
 
     // Select any branches which match *both* of the regexes defined above.
     let pr_branches: Vec<&str> = branches.lines()
         .filter(|b| begins_with_remote_ref.is_match(b))
-        .filter(|b| ends_with_digit.is_match(b))
+        .filter(|b| ends_with_hex.is_match(b))
         .collect();
 
     // Transform each branch "remotes/origin/blah/N" into a PR Name: "blah".  This has some
@@ -206,7 +206,7 @@ pub fn extract_pr_names(branches: &str) -> Vec<String> {
     let mut pr_names = vec![];
     for branch in pr_branches {
         let branch = begins_with_remote_ref.replace_all(&branch, "");
-        let branch = ends_with_digit.replace_all(&branch, "");
+        let branch = ends_with_hex.replace_all(&branch, "");
         pr_names.push(branch.to_string())
     }
 
@@ -275,8 +275,8 @@ mod tests {
           local-junk
         * stuff/I/wrote
           trunk
-          remotes/origin/first-pr/0
-          remotes/origin/second/3
+          remotes/origin/first-pr/000000
+          remotes/origin/second/f3f3f3
           remotes/origin/not-being-tracked
           remotes/origin/has-a-directory-but/still-not-being-tracked
         ";
