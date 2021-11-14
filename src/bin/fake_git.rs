@@ -25,14 +25,54 @@ fn main() {
         // No input given
         None => exit(1),
 
-        // git checkout -b <anything>
-        Some("checkout") => match argv!(2) {
+        Some("-C") => match argv!(2) {
             None => exit(1),
-            Some("-b") => match argv!(3) {
+            Some(_) => match argv!(3) {
                 None => exit(1),
-                Some(_) => exit(0) // Any argument will do, return 0
-            },
-            Some(_) => exit(1)
+
+                // git --version
+                Some("--version") => println!("fake_git version 1"),
+
+                // git branch ...
+                Some("branch") => match argv!(4) {
+                    None => exit(1),
+
+                    // git branch --merged
+                    Some("--merged") => println!("* trunk\nalready-been-merged"),
+
+                    // git branch -d already-been-merged
+                    Some("-d") => match argv!(5) {
+                        None => exit(1),
+                        Some("already-been-merged") => exit(0),
+                        Some(_) => exit(1)
+                    },
+                    Some(_) => exit(1)
+                },
+
+                // git checkout -b <anything>
+                Some("checkout") => match argv!(4) {
+                    None => exit(1),
+                    Some("-b") => match argv!(5) {
+                        None => exit(1),
+                        Some(_) => exit(0) // Any argument will do, return 0
+                    },
+                    Some(_) => exit(1)
+                },
+
+                // git rev-parse --short HEAD
+                Some("rev-parse") => match argv!(4) {
+                    None => exit(1),
+                    Some("--short") => match argv!(5) {
+                        None => exit(1),
+                        Some("HEAD") => println!("1234567"),
+                        Some(_) => exit(1)
+                    },
+                    Some(_) => exit(1)
+                },
+
+                // unrecognized input
+                Some(_) => exit(1)
+            }
         },
 
         // git push -u origin <anything>
@@ -49,29 +89,6 @@ fn main() {
             Some(_) => exit(1)
         },
 
-        // git rev-parse --short HEAD
-        Some("rev-parse") => match argv!(2) {
-            None => exit(1),
-            Some("--short") => match argv!(3) {
-                None => exit(1),
-                Some("HEAD") => println!("1234567"),
-                Some(_) => exit(1)
-            },
-            Some(_) => exit(1)
-        },
-
-        // git --version
-        Some("--version") => println!("fake_git version 1"),
-        Some("branch") => match argv!(2) {
-            None => exit(1),
-            Some("-d") => match argv!(3) {
-                None => exit(1),
-                Some("already-been-merged") => exit(0),
-                Some(_) => exit(1)
-            },
-            Some("--merged") => println!("* trunk\nalready-been-merged"),
-            Some(_) => exit(1)
-        }
         // unrecognized input
         Some(_) => exit(1)
     };

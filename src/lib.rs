@@ -3,6 +3,7 @@
 
 use regex::Regex;
 use std::io;
+use std::path::Path;
 use std::process::Command;
 use std::process::ExitStatus;
 
@@ -13,13 +14,16 @@ use std::process::ExitStatus;
 /// It provides only those features that we need from git in order to set up our PR workflow. It is
 /// intentionally bare-bones: for testing purposes, we want to do as much logic as possible without
 /// relying on an external tool or service. 
-#[derive(Debug)]
 pub struct Git {
     // The path to the version of git we'd like to use. Nominally, this would always be "git", but
     // we allow it to be specified in tests (see the unit tests for this module) so that we can
     // test some functionality against mock implementations of git. This makes it easier to
     // exercise edge cases without having to make real git jump through hoops.
-    program: String,
+    pub program: String,
+
+    // Path to the repository. This is `.` by default in production, but for tests we want to be
+    // able to invoke git as though we were in a temporary, test-specific directory.
+    pub working_dir: Box<dyn AsRef<Path>>,
 }
 
 
@@ -57,7 +61,7 @@ impl Git {
     /// This will rely on the operating system to infer the appropriate path to git, based on the
     /// current environment (just like your shell does it).
     pub fn new() -> Git {
-        Git{ program: String::from("git") }
+        Git{ program: String::from("git"), working_dir: Box::new(String::from(".")) }
     }
 
     /// Report the version of the underlying git binary.
@@ -66,7 +70,9 @@ impl Git {
     /// to users of `git-pr` may help them begin to debug unexpected issues; For example, `git-pr`
     /// may not work correctly with very old versions of git.
     pub fn version(&self) -> Result<String,GitError> {
-        let output = Command::new(&self.program).arg("--version").output()?;
+        let output = Command::new(&self.program)
+            .arg("-C").arg(self.working_dir.as_ref().as_ref())
+            .arg("--version").output()?;
         assert_success(output.status)?;
 
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
@@ -78,7 +84,9 @@ impl Git {
     /// local references to any that have been deleted. This ensures that the user is able to see
     /// the same set of "current PRs" as their collaborators.
     pub fn fetch_prune(&self) -> Result<(),GitError> {
-        let status = Command::new(&self.program).args(&["fetch","--prune"]).status()?;
+        let status = Command::new(&self.program)
+            .arg("-C").arg(self.working_dir.as_ref().as_ref())
+            .args(&["fetch","--prune"]).status()?;
         assert_success(status)?;
 
         Ok(())
@@ -90,7 +98,9 @@ impl Git {
     /// references to remote branches. It is from this list that we can produce the list of
     /// "current PRs".
     pub fn all_branches(&self) -> Result<String,GitError> {
-        let output = Command::new(&self.program).args(&["branch","-a"]).output()?;
+        let output = Command::new(&self.program)
+            .arg("-C").arg(self.working_dir.as_ref().as_ref())
+            .args(&["branch","-a"]).output()?;
         assert_success(output.status)?;
 
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
@@ -98,7 +108,9 @@ impl Git {
 
     /// Produce a list of PRs which are elligible for deletion.
     pub fn merged_branches(&self) -> Result<String,GitError> {
-        let output = Command::new(&self.program).args(&["branch","--merged","trunk"]).output()?;
+        let output = Command::new(&self.program)
+            .arg("-C").arg(self.working_dir.as_ref().as_ref())
+            .args(&["branch","--merged","trunk"]).output()?;
         assert_success(output.status)?;
 
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
@@ -111,7 +123,9 @@ impl Git {
     /// config value, and will return a hash of the indicated length. If this value is not
     /// specificed, git will return the shortest hash necessary to uniquely identify the commit.
     pub fn rev_parse_head(&self) -> Result<String,GitError> {
-        let output = Command::new(&self.program).args(&["rev-parse","--short","HEAD"]).output()?;
+        let output = Command::new(&self.program)
+            .arg("-C").arg(self.working_dir.as_ref().as_ref())
+            .args(&["rev-parse","--short","HEAD"]).output()?;
         assert_success(output.status)?;
 
         Ok(String::from_utf8_lossy(&output.stdout).trim_end().to_string())
@@ -123,7 +137,9 @@ impl Git {
     /// expressed as branches with a certain naming pattern (`pr-name/hash`). So in our system,
     /// creating a branch and creating a pull request are the same operation!
     pub fn create_branch(&self, name: &str) -> Result<(), GitError> {
-        let status = Command::new(&self.program).args(&["checkout","-b",name]).status()?;
+        let status = Command::new(&self.program)
+            .arg("-C").arg(self.working_dir.as_ref().as_ref())
+            .args(&["checkout","-b",name]).status()?;
         assert_success(status)?;
 
         Ok(())
@@ -133,7 +149,9 @@ impl Git {
     ///
     /// Won't delete unmerged branches.
     pub fn delete_branch(&self, name: &str) -> Result<(), GitError> {
-        let status = Command::new(&self.program).args(&["branch","-d",name]).status()?;
+        let status = Command::new(&self.program)
+            .arg("-C").arg(self.working_dir.as_ref().as_ref())
+            .args(&["branch","-d",name]).status()?;
         assert_success(status)?;
 
         Ok(())
@@ -143,7 +161,9 @@ impl Git {
     ///
     /// Used in `git-pr-create` to notify other developers that a new PR has been created.
     pub fn push_upstream(&self, name: &str) -> Result<(), GitError> {
-        let status = Command::new(&self.program).args(&["push","-u","origin",name]).status()?;
+        let status = Command::new(&self.program)
+            .arg("-C").arg(self.working_dir.as_ref().as_ref())
+            .args(&["push","-u","origin",name]).status()?;
         assert_success(status)?;
 
         Ok(())
@@ -211,7 +231,9 @@ mod tests {
     // local to this module, thus eliminating the dead code warning.
     impl Git {
         fn with_path(path: String) -> Git {
-            Git{ program: path }
+            let working_dir = Box::new(".");
+
+            Git{ program: path, working_dir }
         }
     }
 
