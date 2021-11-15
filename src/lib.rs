@@ -2,6 +2,7 @@
 
 
 use regex::Regex;
+use std::fmt;
 use std::io;
 use std::path::Path;
 use std::process::Command;
@@ -52,6 +53,16 @@ fn assert_success(status: ExitStatus) -> Result<(),GitError> {
     match status.success() {
         true => Ok(()),
         false => Err(GitError::Exit(status))
+    }
+}
+
+pub struct ShortHash {
+    content: String
+}
+
+impl fmt::Display for ShortHash {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.content)
     }
 }
 
@@ -122,13 +133,14 @@ impl Git {
     /// indicate the "base" of the current work. This function takes advantage of the `core.abbrev`
     /// config value, and will return a hash of the indicated length. If this value is not
     /// specificed, git will return the shortest hash necessary to uniquely identify the commit.
-    pub fn rev_parse_head(&self) -> Result<String,GitError> {
+    pub fn rev_parse_head(&self) -> Result<ShortHash,GitError> {
         let output = Command::new(&self.program)
             .arg("-C").arg(self.working_dir.as_ref().as_ref())
             .args(&["rev-parse","--short","HEAD"]).output()?;
         assert_success(output.status)?;
 
-        Ok(String::from_utf8_lossy(&output.stdout).trim_end().to_string())
+        let content = String::from_utf8_lossy(&output.stdout).trim_end().to_string();
+        Ok(ShortHash{ content })
     }
 
     /// Create a new branch
