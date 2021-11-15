@@ -1,13 +1,18 @@
 //! Pull request management for bare repos
 
+mod branch_name;
+mod list_of;
+mod local_branch;
 
+use list_of::ListOf;
+use local_branch::LocalBranch;
 use regex::Regex;
-use std::fmt;
 use std::io;
 use std::path::Path;
 use std::process::Command;
 use std::process::ExitStatus;
 
+pub type LocalBranches = ListOf<LocalBranch>;
 
 /// Wrapper for the git command line program
 ///
@@ -53,16 +58,6 @@ fn assert_success(status: ExitStatus) -> Result<(),GitError> {
     match status.success() {
         true => Ok(()),
         false => Err(GitError::Exit(status))
-    }
-}
-
-pub struct ShortHash {
-    content: String
-}
-
-impl fmt::Display for ShortHash {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.content)
     }
 }
 
@@ -118,13 +113,13 @@ impl Git {
     }
 
     /// Produce a list of PRs which are elligible for deletion.
-    pub fn merged_branches(&self) -> Result<String,GitError> {
+    pub fn merged_branches(&self) -> Result<LocalBranches,GitError> {
         let output = Command::new(&self.program)
             .arg("-C").arg(self.working_dir.as_ref().as_ref())
             .args(&["branch","--merged","trunk"]).output()?;
         assert_success(output.status)?;
 
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+        Ok(String::from_utf8_lossy(&output.stdout).parse::<LocalBranches>().unwrap())
     }
 
     /// Get the hash of the HEAD commit.
@@ -133,14 +128,13 @@ impl Git {
     /// indicate the "base" of the current work. This function takes advantage of the `core.abbrev`
     /// config value, and will return a hash of the indicated length. If this value is not
     /// specificed, git will return the shortest hash necessary to uniquely identify the commit.
-    pub fn rev_parse_head(&self) -> Result<ShortHash,GitError> {
+    pub fn rev_parse_head(&self) -> Result<String,GitError> {
         let output = Command::new(&self.program)
             .arg("-C").arg(self.working_dir.as_ref().as_ref())
             .args(&["rev-parse","--short","HEAD"]).output()?;
         assert_success(output.status)?;
 
-        let content = String::from_utf8_lossy(&output.stdout).trim_end().to_string();
-        Ok(ShortHash{ content })
+        Ok(String::from_utf8_lossy(&output.stdout).trim_end().to_string())
     }
 
     /// Create a new branch
@@ -302,8 +296,8 @@ mod tests {
     #[test]
     fn can_detect_merged_branches() {
         let fake_git = Git::with_path(crate_target!("fake_git"));
-        let merged_branches = fake_git.merged_branches().unwrap();
-        assert!(merged_branches.contains("already-been-merged"));
+        let mut merged_branches = fake_git.merged_branches().unwrap();
+        assert!(merged_branches.any(|lb| lb.name.value == "already-been-merged"));
     }
 
     #[test]

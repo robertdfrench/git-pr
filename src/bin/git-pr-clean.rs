@@ -5,8 +5,8 @@ fn main() -> Result<(),libgitpr::GitError> {
     let git = libgitpr::Git::new();
     let merged_branches = git.merged_branches()?;
 
-    for branch in libgitpr::extract_deletable_branches(&merged_branches) {
-        git.delete_branch(&branch)?;
+    for branch in merged_branches.filter(|b| !b.is_head) {
+        git.delete_branch(&branch.name.value)?;
     }
 
     Ok(())

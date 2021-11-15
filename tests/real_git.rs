@@ -79,8 +79,8 @@ fn can_list_all_branches() {
 #[test]
 fn could_clean() {
     let git = temp_repo();
-    let branches = git.merged_branches().unwrap();
-    assert!(branches.contains("hotfix"));
+    let mut branches = git.merged_branches().unwrap();
+    assert!(branches.any(|b| &b.name.value == "hotfix"));
 
     git.delete_branch("hotfix").unwrap();
     let branches = git.all_branches().unwrap();
