@@ -4,11 +4,11 @@
 //! iterable container of T.
 use std::str::FromStr;
 
-pub struct ListOf<T: FromStr> {
+pub struct OutputList<T: FromStr> {
     storage: Vec<T>
 }
 
-impl<T: FromStr> FromStr for ListOf<T> {
+impl<T: FromStr> FromStr for OutputList<T> {
     type Err = std::convert::Infallible;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -20,7 +20,7 @@ impl<T: FromStr> FromStr for ListOf<T> {
     }
 }
 
-impl<T: FromStr> Iterator for ListOf<T> {
+impl<T: FromStr> Iterator for OutputList<T> {
     type Item = T;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -36,7 +36,7 @@ mod tests {
     fn can_parse_list_of_numbers() {
         let source = "1\n2\nthree\n4";
 
-        let list = source.parse::<ListOf<u8>>().unwrap();
+        let list = source.parse::<OutputList<u8>>().unwrap();
         assert_eq!(list.storage.len(), 3);
     }
 
@@ -44,7 +44,7 @@ mod tests {
     fn can_iterate_list_of_numbers() {
         let source = "1\n2\nthree\n4";
 
-        let list = source.parse::<ListOf<u8>>().unwrap();
+        let list = source.parse::<OutputList<u8>>().unwrap();
         assert_eq!(list.collect::<Vec<u8>>(), vec![1,2,4]);
     }
 }

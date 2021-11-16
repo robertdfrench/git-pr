@@ -1,18 +1,18 @@
 //! Pull request management for bare repos
 
 mod branch_name;
-mod list_of;
 mod local_branch;
+mod output_list;
 
-use list_of::ListOf;
 use local_branch::LocalBranch;
+use output_list::OutputList;
 use regex::Regex;
 use std::io;
 use std::path::Path;
 use std::process::Command;
 use std::process::ExitStatus;
 
-pub type LocalBranches = ListOf<LocalBranch>;
+pub type LocalBranches = OutputList<LocalBranch>;
 
 /// Wrapper for the git command line program
 ///
