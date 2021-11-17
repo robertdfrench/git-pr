@@ -55,6 +55,14 @@ fn assert_success(status: ExitStatus) -> Result<(),GitError> {
     }
 }
 
+pub struct AllBranches {
+    pub value: String
+}
+
+pub struct MergedBranches {
+    pub value: String
+}
+
 impl Git {
     /// Create a new "git client".
     ///
@@ -97,23 +105,23 @@ impl Git {
     /// This asks the configured `git` binary to produce a list of *all* known branches, including
     /// references to remote branches. It is from this list that we can produce the list of
     /// "current PRs".
-    pub fn all_branches(&self) -> Result<String,GitError> {
+    pub fn all_branches(&self) -> Result<AllBranches,GitError> {
         let output = Command::new(&self.program)
             .arg("-C").arg(self.working_dir.as_ref().as_ref())
             .args(&["branch","-a"]).output()?;
         assert_success(output.status)?;
 
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+        Ok(AllBranches{ value: String::from_utf8_lossy(&output.stdout).to_string() })
     }
 
     /// Produce a list of PRs which are elligible for deletion.
-    pub fn merged_branches(&self) -> Result<String,GitError> {
+    pub fn merged_branches(&self) -> Result<MergedBranches,GitError> {
         let output = Command::new(&self.program)
             .arg("-C").arg(self.working_dir.as_ref().as_ref())
             .args(&["branch","--merged","trunk"]).output()?;
         assert_success(output.status)?;
 
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+        Ok(MergedBranches{ value: String::from_utf8_lossy(&output.stdout).to_string() })
     }
 
     /// Get the hash of the HEAD commit.
@@ -187,7 +195,7 @@ impl Git {
 ///
 /// * must begin with "remotes/origin/"
 /// * must end with one or more hex digits
-pub fn extract_pr_names(branches: &str) -> Vec<String> {
+pub fn extract_pr_names(all_branches: &AllBranches) -> Vec<String> {
 
     // It's okay to call `.unwrap()` here, because we know that the regexes compile as long as the
     // "parse_branches_into_pr_list" unit test passes.
@@ -195,7 +203,7 @@ pub fn extract_pr_names(branches: &str) -> Vec<String> {
     let ends_with_hex: Regex = Regex::new(r"/[a-f\d]+$").unwrap();
 
     // Select any branches which match *both* of the regexes defined above.
-    let pr_branches: Vec<&str> = branches.lines()
+    let pr_branches: Vec<&str> = all_branches.value.lines()
         .filter(|b| begins_with_remote_ref.is_match(b))
         .filter(|b| ends_with_hex.is_match(b))
         .collect();
@@ -213,8 +221,8 @@ pub fn extract_pr_names(branches: &str) -> Vec<String> {
     pr_names
 }
 
-pub fn extract_deletable_branches(branches: &str) -> Vec<String> {
-    branches.lines()
+pub fn extract_deletable_branches(merged_branches: &MergedBranches) -> Vec<String> {
+    merged_branches.value.lines()
         .filter(|b| !b.starts_with("*")) // skip the current branch
         .map(|b| b.trim_start()) // remove left-hand gutter characters
         .map(|b| b.trim_end()) // remove newlines
@@ -271,7 +279,7 @@ mod tests {
     // Show that we can extract a list of pr names from the output of `git branch -a`.
     #[test]
     fn parse_branches_into_pr_list() {
-        let branches: &'static str = "
+        let value = String::from("
           local-junk
         * stuff/I/wrote
           trunk
@@ -279,9 +287,9 @@ mod tests {
           remotes/origin/second/f3f3f3
           remotes/origin/not-being-tracked
           remotes/origin/has-a-directory-but/still-not-being-tracked
-        ";
+        ");
 
-        let pr_names = extract_pr_names(branches);
+        let pr_names = extract_pr_names(&AllBranches{ value });
         assert_eq!(pr_names.len(), 2);
         assert_eq!(pr_names[0], "first-pr");
         assert_eq!(pr_names[1], "second");
@@ -291,7 +299,7 @@ mod tests {
     fn can_detect_merged_branches() {
         let fake_git = Git::with_path(crate_target!("fake_git"));
         let merged_branches = fake_git.merged_branches().unwrap();
-        assert!(merged_branches.contains("already-been-merged"));
+        assert!(merged_branches.value.contains("already-been-merged"));
     }
 
     #[test]
@@ -302,13 +310,14 @@ mod tests {
 
     #[test]
     fn identify_branches_for_deletion() {
-        let merged_branches = vec![
+        let value = vec![
             "  one",
             "* two",
             "  trunk",
             "  three",
             ""
         ].join("\n");
+        let merged_branches = MergedBranches{ value };
 
         let pr_names = extract_deletable_branches(&merged_branches);
         assert_eq!(pr_names.len(), 2);
