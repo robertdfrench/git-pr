@@ -1,6 +1,10 @@
 //! Pull request management for bare repos
 
+pub mod execute;
 
+pub use execute::ExecutionError;
+
+use execute::Execute;
 use regex::Regex;
 use std::io;
 use std::path::Path;
@@ -41,17 +45,19 @@ pub enum GitError {
     Exit(ExitStatus)
 }
 
-impl From<io::Error> for GitError {
-    /// Wrap an [`io::Error`] in a [`GitError::Io`]
-    fn from(other: io::Error) -> GitError {
-        GitError::Io(other)
-    }
-}
-
-fn assert_success(status: ExitStatus) -> Result<(),GitError> {
-    match status.success() {
-        true => Ok(()),
-        false => Err(GitError::Exit(status))
+impl From<ExecutionError> for GitError {
+    /// Convert an [`ExecutionError`] into a [`GitError`]
+    ///
+    /// This is scaffolding that allows us to limit the number of changes needed to implement
+    /// [#49][1]. Once this code has been adopted, we should be able to remove [`GitError`]
+    /// altogether and simply return [`ExecutionError`] instead.
+    ///
+    /// [1]: https://github.com/robertdfrench/git-pr/issues/49
+    fn from(execution_error: ExecutionError) -> GitError {
+        match execution_error {
+            ExecutionError::Io(e) => GitError::Io(e),
+            ExecutionError::Exit(e) => GitError::Exit(e)
+        }
     }
 }
 
@@ -64,18 +70,21 @@ impl Git {
         Git{ program: String::from("git"), working_dir: Box::new(String::from(".")) }
     }
 
+    fn git(&self) -> Command {
+        let mut git = Command::new(&self.program);
+        git.arg("-C").arg(self.working_dir.as_ref().as_ref());
+        return git;
+    }
+
     /// Report the version of the underlying git binary.
     ///
     /// This is equivalent to invoking `git --version` on the command line. Making this transparent
     /// to users of `git-pr` may help them begin to debug unexpected issues; For example, `git-pr`
     /// may not work correctly with very old versions of git.
     pub fn version(&self) -> Result<String,GitError> {
-        let output = Command::new(&self.program)
-            .arg("-C").arg(self.working_dir.as_ref().as_ref())
-            .arg("--version").output()?;
-        assert_success(output.status)?;
+        let version = self.git().capture_stdout(&["--version"])?;
 
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+        Ok(version)
     }
 
     /// Update the local branch list.
@@ -84,10 +93,7 @@ impl Git {
     /// local references to any that have been deleted. This ensures that the user is able to see
     /// the same set of "current PRs" as their collaborators.
     pub fn fetch_prune(&self) -> Result<(),GitError> {
-        let status = Command::new(&self.program)
-            .arg("-C").arg(self.working_dir.as_ref().as_ref())
-            .args(&["fetch","--prune"]).status()?;
-        assert_success(status)?;
+        self.git().capture_nothing(&["fetch","--prune"])?;
 
         Ok(())
     }
@@ -98,22 +104,16 @@ impl Git {
     /// references to remote branches. It is from this list that we can produce the list of
     /// "current PRs".
     pub fn all_branches(&self) -> Result<String,GitError> {
-        let output = Command::new(&self.program)
-            .arg("-C").arg(self.working_dir.as_ref().as_ref())
-            .args(&["branch","-a"]).output()?;
-        assert_success(output.status)?;
+        let branches = self.git().capture_stdout(&["branch","-a"])?;
 
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+        Ok(branches)
     }
 
     /// Produce a list of PRs which are elligible for deletion.
     pub fn merged_branches(&self) -> Result<String,GitError> {
-        let output = Command::new(&self.program)
-            .arg("-C").arg(self.working_dir.as_ref().as_ref())
-            .args(&["branch","--merged","trunk"]).output()?;
-        assert_success(output.status)?;
+        let branches = self.git().capture_stdout(&["branch","--merged","trunk"])?;
 
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+        Ok(branches)
     }
 
     /// Get the hash of the HEAD commit.
@@ -123,12 +123,9 @@ impl Git {
     /// config value, and will return a hash of the indicated length. If this value is not
     /// specificed, git will return the shortest hash necessary to uniquely identify the commit.
     pub fn rev_parse_head(&self) -> Result<String,GitError> {
-        let output = Command::new(&self.program)
-            .arg("-C").arg(self.working_dir.as_ref().as_ref())
-            .args(&["rev-parse","--short","HEAD"]).output()?;
-        assert_success(output.status)?;
+        let short_hash = self.git().capture_stdout(&["rev-parse","--short","HEAD"])?;
 
-        Ok(String::from_utf8_lossy(&output.stdout).trim_end().to_string())
+        Ok(short_hash)
     }
 
     /// Create a new branch
@@ -137,10 +134,7 @@ impl Git {
     /// expressed as branches with a certain naming pattern (`pr-name/hash`). So in our system,
     /// creating a branch and creating a pull request are the same operation!
     pub fn create_branch(&self, name: &str) -> Result<(), GitError> {
-        let status = Command::new(&self.program)
-            .arg("-C").arg(self.working_dir.as_ref().as_ref())
-            .args(&["checkout","-b",name]).status()?;
-        assert_success(status)?;
+        self.git().capture_nothing(&["checkout","-b",name])?;
 
         Ok(())
     }
@@ -149,10 +143,7 @@ impl Git {
     ///
     /// Won't delete unmerged branches.
     pub fn delete_branch(&self, name: &str) -> Result<(), GitError> {
-        let status = Command::new(&self.program)
-            .arg("-C").arg(self.working_dir.as_ref().as_ref())
-            .args(&["branch","-d",name]).status()?;
-        assert_success(status)?;
+        self.git().capture_nothing(&["branch","-d",name])?;
 
         Ok(())
     }
@@ -161,10 +152,7 @@ impl Git {
     ///
     /// Used in `git-pr-create` to notify other developers that a new PR has been created.
     pub fn push_upstream(&self, name: &str) -> Result<(), GitError> {
-        let status = Command::new(&self.program)
-            .arg("-C").arg(self.working_dir.as_ref().as_ref())
-            .args(&["push","-u","origin",name]).status()?;
-        assert_success(status)?;
+        self.git().capture_nothing(&["push","-u","origin",name])?;
 
         Ok(())
     }
