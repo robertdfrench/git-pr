@@ -68,7 +68,7 @@ fn fetch_and_prune() {
 fn can_list_all_branches() {
     let git = temp_repo();
     let branches = git.all_branches().unwrap();
-    assert!(branches.contains("trunk"));
+    assert!(branches.value.contains("trunk"));
 }
 
 // Cleaning PRs requires that we identify "old" branches (those which have been merged into trunk),
@@ -80,11 +80,11 @@ fn can_list_all_branches() {
 fn could_clean() {
     let git = temp_repo();
     let branches = git.merged_branches().unwrap();
-    assert!(branches.contains("hotfix"));
+    assert!(branches.value.contains("hotfix"));
 
     git.delete_branch("hotfix").unwrap();
     let branches = git.all_branches().unwrap();
-    assert!(!branches.contains("hotfix"));
+    assert!(!branches.value.contains("hotfix"));
 }
 
 #[test]
@@ -104,5 +104,5 @@ fn can_create_new_branch() {
     let git = temp_repo();
     git.create_branch("knurt").unwrap();
     let branches = git.all_branches().unwrap();
-    assert!(branches.contains("knurt"));
+    assert!(branches.value.contains("knurt"));
 }
