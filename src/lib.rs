@@ -55,10 +55,20 @@ fn assert_success(status: ExitStatus) -> Result<(),GitError> {
     }
 }
 
+
+/// Output from `git branch -a`
+///
+/// This type wraps the output from `git branch -a`, and gives us a way to leverage Rust's type
+/// system to treat this differently from other git output.
 pub struct AllBranches {
     pub value: String
 }
 
+
+/// Output from `git branch --merged`
+///
+/// This type wraps the output from `git branch --merged`, and gives us a way to leverage Rust's
+/// type system to treat this differently from other git output.
 pub struct MergedBranches {
     pub value: String
 }
