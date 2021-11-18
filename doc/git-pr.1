@@ -1,0 +1,161 @@
+.Dd November 18, 2021
+.Dt GIT-PR 1
+.Os
+\#
+\#
+\#
+.Sh NAME
+.Nm git-pr
+.Nd Manage pull requests using only a bare repository.
+\#
+\#
+\#
+.Sh SYNOPSIS
+.Nm git pr Fl Fl abandon Ar pr-name
+.Nm git pr Fl Fl accept Ar pr-name
+.Nm git pr Fl Fl clean
+.Nm git pr Fl Fl create Ar pr-name
+.Nm git pr Fl Fl list
+.Nm git pr Fl Fl rebase Ar pr-name
+\#
+\#
+\#
+.Sh DESCRIPTION
+The
+.Nm
+utility facilitates the management of pull requests for bare repositories.
+.Pp
+.Nm
+works with your existing
+.Xr git 1
+repositories, alongside your existing
+.Xr git 1
+installation. Pull requests are expressed as specially-named branches, and
+operations on pull requests are implemented via operations on those
+branches.
+.Pp
+.Nm
+assumes
+.Ad origin
+is the name of your primary remote repository, and that
+.Ad trunk
+is the default branch.
+.Pp
+The primary subcommands are as follows:
+.Bl -tag -width Ds
+.It Fl Fl abandon Ar pr-name
+Discard any local or remote branches whose prefix matches
+.Ar pr-name .
+Requires a network connection.
+.It Fl Fl accept Ar pr-name
+Merge
+.Ar pr-name
+into
+.Ad trunk ,
+deleting both the local and remote copies of 
+.Ar pr-name .
+Requires a network connection
+.It Fl Fl clean
+Remove references to any pull requests which have already been accepted or
+abandoned.
+.It Fl Fl create Ar pr-name
+Create a new pull request called
+.Ar pr-name
+by creating a branch named
+.Do
+.Ar pr-name
+.Li /
+.Va hash
+.Dc
+where
+.Va hash
+is the short form of the SHA1 hash of the current commit (equivalent to calling
+.Ic "git rev-parse --short HEAD" ) .
+This new branch is also pushed to
+.Ad origin ,
+and therefore this command requires a network connection.
+.It Fl Fl list
+Show a list of currently active (neither abandoned nor accepted) pull requests.
+Requires a network connection.
+.It Fl Fl rebase Ar pr-name
+Rebase (using
+.Ic "git rebase -i" )
+.Ar pr-name
+against the latest
+.Ad trunk .
+Useful for updating commits in 
+.Ar pr-name
+after another pr has been accepted.
+\#
+\#
+\#
+.Sh EXAMPLES
+To create a new pull request called 
+.Dq improve-documentation :
+.Pp
+.Dl $ git pr --create improve-documentation
+.Pp
+To see what pull requests alredy exist (and have not yet been closed):
+.Pp
+.Dl $ git pr --list
+.Pp
+To review a pull request named
+.Dq fix-grammar-mistakes ,
+you can rely on tab-completion to identify the latest hash:
+.Pp
+.Dl $ git switch fix-grammar-mistakes/<TAB>
+.Pp
+If you decide that the code should be merged into
+.Ad trunk ,
+you can accept this pull request:
+.Pp
+.Dl $ git pr --accept fix-grammar-mistakes
+.Pp
+If your collaborator decides they no longer want this pull request to be merged,
+they abandon it:
+.Pp
+.Dl $ git pr --abandon fix-grammar-mistakes
+.Pp
+(For what it's worth, you can abandon your collaborator's pull requests, but
+doing so without prior discussion might yield poor results).
+.Pp
+Finally, if
+.Dq fix-grammar-mistakes
+is accepted, you will need to incorporate those changes into
+.Dq improve-documentation
+like so:
+.Pp
+.Dl $ git pr --rebase improve-documentation
+.Pp
+This will ensure that every commit in
+.Dq improve-documentation
+is a descendant of
+.Ad trunk ,
+thus keeping your team's history linear.
+\#
+\#
+\#
+.Sh DIAGNOSTICS
+Messages displayed by
+.Nm
+mostly emanate from the underlying
+.Xr git 1
+commands. Consult
+.Xr git 1
+and associated manual entries for more detailed diagnostic information.
+\#
+\#
+\#
+.Sh SEE ALSO
+.Xr git 1
+\#
+\#
+\#
+.Sh AUTHORS
+.An -nosplit
+The
+.Nm
+utility was written by
+.An Robert D. French Aq Mt robert@robertdfrench.me
+and
+.An J. Caleb Wherry Aq Mt caleb@calebwherry.com .
